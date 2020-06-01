@@ -94,7 +94,7 @@ class Cluster_Characteristics:
 
 		return(distance_matrix)
 
-	def plot_silhouette(self, position=False, kmax = 10):
+	def plot_silhouette(self, position=False, kmax = 10, model=None):
 
 		flatten_shape = self.weights.shape[0]*self.weights.shape[1]*self.weights.shape[2]
 		X = self.weights.reshape((flatten_shape, -1))
@@ -108,56 +108,55 @@ class Cluster_Characteristics:
 		dist = self.distance_matrix(X,  self.order)
 
 		if self.kmax is not None:
-			n_range = range(self.kmax+2, self.kmax+3)
+			n_clusters = self.kmax + 2
 			fig = plt.figure()
 			fig.set_size_inches(10, 5)
+		
+			plt.xlim([-0.1, 0.3])
+			plt.ylim([0, len(X) + (n_clusters + 1) * 10])
+			clusterer = AgglomerativeClustering(n_clusters = n_clusters, affinity='precomputed', linkage='average')
+			cluster_labels = clusterer.fit_predict(dist)
+			silhouette_avg = silhouette_score(dist, cluster_labels, metric = 'precomputed')
+			print("For n_clusters =", n_clusters,
+			  "The average silhouette_score is :", silhouette_avg)
+			sample_silhouette_values = silhouette_samples(dist, cluster_labels, metric = 'precomputed')
 
-			for n_clusters in n_range:
-				plt.xlim([-0.1, 0.3])
-				plt.ylim([0, len(X) + (n_clusters + 1) * 10])
-				clusterer = AgglomerativeClustering(n_clusters = n_clusters, affinity='precomputed', linkage='average')
-				cluster_labels = clusterer.fit_predict(dist)
-				silhouette_avg = silhouette_score(dist, cluster_labels, metric = 'precomputed')
-				print("For n_clusters =", n_clusters,
-				  "The average silhouette_score is :", silhouette_avg)
-				sample_silhouette_values = silhouette_samples(dist, cluster_labels, metric = 'precomputed')
+			y_lower = 10
+			for i in range(n_clusters):
+				# Aggregate the silhouette scores for samples belonging to
+				# cluster i, and sort them
+				ith_cluster_silhouette_values = \
+				    sample_silhouette_values[cluster_labels == i]
 
-				y_lower = 10
-				for i in range(n_clusters):
-					# Aggregate the silhouette scores for samples belonging to
-					# cluster i, and sort them
-					ith_cluster_silhouette_values = \
-					    sample_silhouette_values[cluster_labels == i]
+				ith_cluster_silhouette_values.sort()
 
-					ith_cluster_silhouette_values.sort()
+				size_cluster_i = ith_cluster_silhouette_values.shape[0]
+				y_upper = y_lower + size_cluster_i
 
-					size_cluster_i = ith_cluster_silhouette_values.shape[0]
-					y_upper = y_lower + size_cluster_i
+				color = plt.cm.nipy_spectral(float(i) / n_clusters)
+				plt.fill_betweenx(np.arange(y_lower, y_upper),
+				                  0, ith_cluster_silhouette_values,
+				                  facecolor=color, edgecolor=color, alpha=0.7)
 
-					color = plt.cm.nipy_spectral(float(i) / n_clusters)
-					plt.fill_betweenx(np.arange(y_lower, y_upper),
-					                  0, ith_cluster_silhouette_values,
-					                  facecolor=color, edgecolor=color, alpha=0.7)
+				# Label the silhouette plots with their cluster numbers at the middle
+				plt.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
 
-					# Label the silhouette plots with their cluster numbers at the middle
-					plt.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+				# Compute the new y_lower for next plot
+				y_lower = y_upper + 10  # 10 for the 0 samples
 
-					# Compute the new y_lower for next plot
-					y_lower = y_upper + 10  # 10 for the 0 samples
+				# ax[idx].set_title("The silhouette plot for the various clusters.")
+				plt.xlabel("The silhouette coefficient values")
+				plt.ylabel("Cluster label")
 
-					# ax[idx].set_title("The silhouette plot for the various clusters.")
-					plt.xlabel("The silhouette coefficient values")
-					plt.ylabel("Cluster label")
+				# The vertical line for average silhouette score of all the values
+				plt.axvline(x=silhouette_avg, color="red", linestyle="--")
 
-					# The vertical line for average silhouette score of all the values
-					plt.axvline(x=silhouette_avg, color="red", linestyle="--")
+				plt.yticks([])  # Clear the yaxis labels / ticks
+				# plt.xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
 
-					plt.yticks([])  # Clear the yaxis labels / ticks
-					# plt.xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
-
-					plt.suptitle(("Silhouette analysis for KMeans clustering on sample data "
-					          "with n_clusters = %d" % n_clusters),
-					         fontsize=14, fontweight='bold')
+				plt.suptitle(("Silhouette analysis for KMeans clustering on sample data "
+				          "with n_clusters = %d" % n_clusters),
+				         fontsize=14, fontweight='bold')
 
 			plt.show()
 		else: 
